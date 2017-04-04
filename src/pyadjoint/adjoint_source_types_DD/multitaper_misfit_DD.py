@@ -561,9 +561,13 @@ def calculate_adjoint_source_DD(observed1, synthetic1, observed2, synthetic2,
         # MT_DD
         if is_mtm:
             measure1_wins["type"] = "mt_dd_1"
+            measure1_wins["dt"] = sigma_dt_cc
+            measure1_wins["ddt"] = np.mean(ddtau_mtm[nfreq_min:nfreq_max])
             measure1_wins["ddt_w"] = ddtau_mtm[nfreq_min:nfreq_max]
 
             measure2_wins["type"] = "mt_dd_2"
+            measure2_wins["dt"] = - sigma_dt_cc
+            measure2_wins["ddt"] = - measure1_wins["ddt"]
             measure2_wins["ddt_w"] = - ddtau_mtm[nfreq_min:nfreq_max]
 
             # calculate multi-taper adjoint source
@@ -585,6 +589,9 @@ def calculate_adjoint_source_DD(observed1, synthetic1, observed2, synthetic2,
             # calculate multi-taper adjoint source
             fp1_t, fp2_t, misfit_p = \
                 cc_adj_DD(s1, s2, shift_syn, dd_shift, deltat, sigma_dt_cc)
+
+        if abs(measure1_wins["ddt"]) > config.min_period/2.0:
+            misfit_p = 0
 
         # All adjoint sources will need windowing taper again
         window_taper(fp1_t[0:nlen1], taper_percentage=config.taper_percentage,
