@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- encoding: utf8 -*-
+# -*- coding: utf-8 -*-
 """
 Central interfaces for ``Pyadjoint``.
 
@@ -383,6 +383,121 @@ def calculate_adjoint_source(adj_src_type, observed, synthetic, config,
                          component=observed.stats.channel,
                          location=observed.stats.location,
                          starttime=observed.stats.starttime)
+
+
+def calculate_attenuation_adjoint_source(
+        adj_src_type, observed, synthetic, config,
+        window, adjoint_src=True,
+        plot=False, plot_filename=None, f0=1.0,
+        **kwargs):
+
+    adj = calculate_adjoint_source(adj_src_type, observed, synthetic,
+                                   config, window, adjoint_src,
+                                   plot=False, plot_filename=None,
+                                   **kwargs)
+
+    # TODO: if not adjoint source
+    if adjoint_src:
+        from .utils import window_taper
+        from scipy.fftpack import hilbert as hilbert_transform
+        twopi = 2*np.pi
+        w0 = twopi*f0
+        f = adj.adjoint_source[::-1]  # forward in time
+        # f = adj.adjoint_source
+        F = np.fft.fft(f)
+        freqs = np.fft.fftfreq(len(f), d=adj.dt)
+        w = twopi*freqs
+        # fig, ax = plt.subplots()
+        w[0] = w0
+        # phy = np.conj((2/np.pi)*np.l# o
+        phy = (2/np.pi)*np.log(np.abs(w)/w0)
+        # g(np.abs(w)/w0))
+        # phy = np.log(np.abs(w)/w0)
+        phy[0] = phy[1]
+        atten_adj_source_1 = np.real(np.fft.ifft(F*phy))
+
+        amp = -1j*np.sign(w)
+        atten_adj_source_2 = np.real(np.fft.ifft(F*amp))
+        atten_adj_source = atten_adj_source_1 + atten_adj_source_2
+
+        mask = np.zeros(len(atten_adj_source))
+
+        for wins in window:
+            left_window_border = wins[0]
+            right_window_border = wins[1]
+            left_sample = int(np.floor(left_window_border / adj.dt)) + 1
+            nlen = int(np.floor((right_window_border -
+                                 left_window_border) / adj.dt)) + 1
+            right_sample = left_sample + nlen
+            mask[left_sample:right_sample] = 1
+
+            window_taper(atten_adj_source[left_sample:right_sample],
+                         taper_percentage=config.taper_percentage,
+                         taper_type=config.taper_type)
+            window_taper(atten_adj_source_1[left_sample:right_sample],
+                         taper_percentage=config.taper_percentage,
+                         taper_type=config.taper_type)
+            window_taper(atten_adj_source_2[left_sample:right_sample],
+                         taper_percentage=config.taper_percentage,
+                         taper_type=config.taper_type)
+
+        atten_adj_source *= mask
+        atten_adj_source_1 *= mask
+        atten_adj_source_2 *= mask
+
+    adj.adjoint_source = atten_adj_source[::-1]
+    adj.adjoint_source_1 = atten_adj_source_1[::-1]
+    adj.adjoint_source_2 = atten_adj_source_2[::-1]
+
+
+    # Windowed version
+    #     atten_adj_source = np.zeros(len(f))
+    #     atten_adj_source_1 = np.zeros(len(f))
+    #     atten_adj_source_2 = np.zeros(len(f))
+    #     for wins in window:
+    #         left_window_border = wins[0]
+    #         right_window_border = wins[1]
+
+    #         left_sample = int(np.floor(left_window_border / adj.dt)) + 1
+    #         nlen = int(np.floor((right_window_border -
+    #                              left_window_border) / adj.dt)) + 1
+    #         right_sample = left_sample + nlen
+
+    #         d = np.zeros(nlen)
+    #         d[0:nlen] = f[left_sample:right_sample]
+    #         window_taper(d, taper_percentage=config.taper_percentage,
+    #                      taper_type=config.taper_type)
+
+    #         F = np.fft.fft(d)
+    #         freqs = np.fft.fftfreq(nlen, d=adj.dt)
+    #         w = twopi*freqs
+
+    #         phy = ((2/np.pi)*np.log(np.abs(w)/w0))
+    #         phy[0] = 0.0  # where frequency is zero phy will be infinity
+    #         adj_phy = np.fft.ifft(F*phy)
+
+    #         amp = -1j*np.sign(w)
+    #         adj_amp = np.fft.ifft(F*amp)
+    #         atten_adj = adj_phy + adj_amp
+
+    #         window_taper(atten_adj, taper_percentage=config.taper_percentage,
+    #                      taper_type=config.taper_type)
+    #         window_taper(adj_phy, taper_percentage=config.taper_percentage,
+    #                      taper_type=config.taper_type)
+    #         window_taper(adj_amp, taper_percentage=config.taper_percentage,
+    #                      taper_type=config.taper_type)
+
+    #         atten_adj_source[left_sample:right_sample] = atten_adj
+    #         atten_adj_source_1[left_sample:right_sample] = adj_phy
+    #         atten_adj_source_2[left_sample:right_sample] = adj_amp
+
+    # adj.adjoint_source = atten_adj_source
+    # adj.adjoint_source_1 = atten_adj_source_1
+    # adj.adjoint_source_2 = atten_adj_source_2
+
+    # TODO: Plot
+
+    return adj
 
 
 def calculate_adjoint_source_DD(adj_src_type, observed1, synthetic1,
