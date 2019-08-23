@@ -228,6 +228,18 @@ class ConfigDoubleDifferenceCrossCorrelation(object):
         self.dlna_sigma_min = dlna_sigma_min
 
 
+class ConfigDoubleDifferenceWaveForm(object):
+    def __init__(self, min_period, max_period,
+                 taper_type='hann',
+                 taper_percentage=0.3):
+
+        self.min_period = min_period
+        self.max_period = max_period
+
+        self.taper_type = taper_type
+        self.taper_percentage = taper_percentage
+
+
 class ConfigDoubleDifferenceMultiTaper(object):
     def __init__(self, min_period, max_period,
                  lnpt=15,
